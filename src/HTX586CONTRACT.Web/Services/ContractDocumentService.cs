@@ -16,6 +16,7 @@ public sealed class ContractDocumentService(
     IUploadFileStorage storage,
     ILogger<ContractDocumentService> logger) : IContractDocumentService
 {
+    // Lưu chữ ký của khách hàng vào thư mục upload riêng, không dùng wwwroot. File chỉ trở thành file chính thức   
     public async Task<string> SaveSignatureAsync(
         Guid contractId,
         string party,
@@ -222,6 +223,7 @@ public sealed class ContractDocumentService(
         }
     }
 
+    // Tạo PDF cuối cùng từ dữ liệu hợp đồng và chữ ký đã lưu. PDF được tạo trực tiếp từ layout JSON, không cần Word/LibreOffice.
     public async Task<string> GeneratePdfAsync(Guid contractId, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -337,6 +339,7 @@ public sealed class ContractDocumentService(
         return ReadPositiveNumber(number);
     }
 
+    // Chuyển số nguyên dương sang chữ tiếng Việt, ví dụ 123456789 -> "một trăm hai mươi ba triệu bốn trăm năm mươi sáu nghìn bảy trăm tám mươi chín"
     private static string ReadPositiveNumber(long number)
     {
         string[] units = ["", "nghìn", "triệu", "tỷ", "nghìn tỷ", "triệu tỷ"];
@@ -365,6 +368,7 @@ public sealed class ContractDocumentService(
         return string.Join(" ", parts);
     }
 
+    // Chuyển một số nguyên từ 0 đến 999 sang chữ tiếng Việt, ví dụ 123 -> "một trăm hai mươi ba"
     private static string ReadThreeDigits(int number, bool full)
     {
         string[] digit = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
@@ -409,6 +413,7 @@ public sealed class ContractDocumentService(
     }
 
 
+    // Chuyển tên hợp đồng sang dạng an toàn cho tên file, ví dụ "Hợp đồng #123" -> "hop-dong-123"
     private static string SafeFileName(string value)
     {
         var invalid = Path.GetInvalidFileNameChars();
@@ -443,10 +448,12 @@ public sealed class ContractDocumentService(
         }
     }
 
+    // Tạo hash SHA256 của hợp đồng tại thời điểm ký để lưu vào ContractSignature.ContractHashAtSigning.
     private static string ContractHash(HTX586CONTRACT.Domain.Contracts.Contract contract)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{contract.Id}|{contract.ContractNumber}|{contract.CompanyProfileId}|{contract.DriverId}|{contract.CustomerId}|{contract.VehicleId}|{contract.ContractValue}|{contract.UpdatedAt:o}")));
 
+    // Lấy tên người ký mặc định từ dữ liệu snapshot của hợp đồng. Nếu không có snapshot, trả về chuỗi rỗng.
     private static string DefaultSignerName(HTX586CONTRACT.Domain.Contracts.Contract contract, SignatureParty role) => role switch
     {
         SignatureParty.RepresentativeOffice => contract.CompanyRepresentativeSnapshot,
@@ -455,6 +462,7 @@ public sealed class ContractDocumentService(
         _ => contract.DriverNameSnapshot
     };
 
+    // Lấy tên vai trò ký để hiển thị trong thông báo lỗi hoặc nhật ký. Ví dụ: SignatureParty.Customer -> "KHÁCH HÀNG (NGƯỜI THUÊ XE)"
     private static string RoleName(SignatureParty role) => role switch
     {
         SignatureParty.RepresentativeOffice => "VĂN PHÒNG ĐẠI DIỆN",
@@ -463,6 +471,7 @@ public sealed class ContractDocumentService(
         _ => "TÀI XẾ CHẠY"
     };
 
+    // Lấy tiêu đề hợp đồng theo loại kinh doanh. Ví dụ: ContractBusinessType.Cargo -> "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA"
     private static string BusinessTitle(ContractBusinessType type) => type switch
     {
         ContractBusinessType.Cargo => "HỢP ĐỒNG VẬN CHUYỂN HÀNG HÓA",

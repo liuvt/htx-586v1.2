@@ -96,21 +96,29 @@ public sealed class PdfContractTemplateRenderer(
                             field.Height);
                     }
 
-                    var pngBytes = TextPngRenderer.Render(
+                    var renderedText = TextPngRenderer.Render(
                         text,
                         field,
                         layout.FontFamily,
                         layout.FallbackFontFamilies);
 
                     using var stream = new MemoryStream(
-                        pngBytes, 0, pngBytes.Length, writable: false, publiclyVisible: true);
+                        renderedText.PngBytes,
+                        0,
+                        renderedText.PngBytes.Length,
+                        writable: false,
+                        publiclyVisible: true);
                     using var image = XImage.FromStream(stream);
+
+                    var drawX = ResolveAlignedX(field, renderedText.WidthPoints);
+                    var drawY = ResolveAlignedY(field, renderedText.HeightPoints);
+
                     graphics.DrawImage(
                         image,
-                        field.X,
-                        field.Y,
-                        field.Width,
-                        field.Height);
+                        drawX,
+                        drawY,
+                        renderedText.WidthPoints,
+                        renderedText.HeightPoints);
                 }
 
                 foreach (var field in layout.ImageFields.Where(x => x.Page == pageNumber))
@@ -195,6 +203,28 @@ public sealed class PdfContractTemplateRenderer(
             : Path.GetFullPath(Path.Combine(environment.ContentRootPath, path));
     }
 
+    private static double ResolveAlignedX(PdfTextFieldLayout field, double renderedWidth)
+    {
+        if (field.Alignment.Equals("Center", StringComparison.OrdinalIgnoreCase))
+            return field.X + Math.Max(0d, (field.Width - renderedWidth) / 2d);
+
+        if (field.Alignment.Equals("Right", StringComparison.OrdinalIgnoreCase))
+            return field.X + Math.Max(0d, field.Width - renderedWidth);
+
+        return field.X;
+    }
+
+    private static double ResolveAlignedY(PdfTextFieldLayout field, double renderedHeight)
+    {
+        if (field.VerticalAlignment.Equals("Top", StringComparison.OrdinalIgnoreCase))
+            return field.Y;
+
+        if (field.VerticalAlignment.Equals("Bottom", StringComparison.OrdinalIgnoreCase))
+            return field.Y + Math.Max(0d, field.Height - renderedHeight);
+
+        return field.Y + Math.Max(0d, (field.Height - renderedHeight) / 2d);
+    }
+
     private static void DrawContainedImage(
         XGraphics graphics,
         XImage image,
@@ -241,7 +271,7 @@ public sealed class PdfContractTemplateRenderer(
             ["CONTRACT_YEAR"] = contractDate.ToString("yyyy"),
             ["CONTRACT_DATE"] = contractDate.ToString("dd 'tháng' MM 'năm' yyyy", CultureInfo.GetCultureInfo("vi-VN")),
             ["PASSENGER_LIST_SUBTITLE"] =
-                $"(Kèm theo hợp đồng vận chuyển số {First(contract.ContractNumber, "...")}/HDVC-HTX " +
+                $"(Kèm theo hợp đồng vận chuyển số {First(contract.ContractNumber, "...")}/HĐVC-HTX " +
                 $"ngày {contractDate:dd} tháng {contractDate:MM} năm {contractDate:yyyy})",
 
             ["COMPANY_NAME"] = companyName,
@@ -487,8 +517,8 @@ public sealed class PdfContractTemplateRenderer(
         public double Y { get; set; }
         public double Width { get; set; }
         public double Height { get; set; }
-        public float FontSize { get; set; } = 9;
-        public float MinFontSize { get; set; } = 5.5f;
+        public float FontSize { get; set; } = 11;
+        public float MinFontSize { get; set; } = 8.0f;
         public int MaxLines { get; set; } = 1;
         public string Alignment { get; set; } = "Left";
         public string VerticalAlignment { get; set; } = "Center";
@@ -512,23 +542,17 @@ public sealed class PdfContractTemplateRenderer(
     private static class TextPngRenderer
     {
         private const float Scale = 4f;
+        private const float PaddingX = 1.0f;
+        private const float PaddingY = 0.5f;
 
-        public static byte[] Render(
+        public static RenderedTextImage Render(
             string value,
             PdfTextFieldLayout field,
             string primaryFontFamily,
             IReadOnlyList<string> fallbackFontFamilies)
         {
-            var pixelWidth = Math.Max(1, (int)Math.Ceiling(field.Width * Scale));
-            var pixelHeight = Math.Max(1, (int)Math.Ceiling(field.Height * Scale));
-
-            using var bitmap = new SKBitmap(
-                pixelWidth,
-                pixelHeight,
-                SKColorType.Bgra8888,
-                SKAlphaType.Premul);
-            using var canvas = new SKCanvas(bitmap);
-            canvas.Clear(SKColors.Transparent);
+            var maxWidth = Math.Max(1f, (float)(field.Width * Scale) - (PaddingX * 2f * Scale));
+            var maxHeight = Math.Max(1f, (float)(field.Height * Scale) - (PaddingY * 2f * Scale));
 
             using var typeface = ResolveTypeface(
                 primaryFontFamily,
@@ -546,21 +570,23 @@ public sealed class PdfContractTemplateRenderer(
                 SubpixelText = true
             };
 
-            var maxWidth = pixelWidth - 2f * Scale;
-            var maxHeight = pixelHeight - 1f * Scale;
             var fontSize = field.FontSize;
             List<string> lines;
+            float widest;
+            float blockHeight;
+            SKFontMetrics finalMetrics;
+            float finalLineHeight;
 
             while (true)
             {
                 paint.TextSize = fontSize * Scale;
                 lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
-                var metrics = paint.FontMetrics;
-                var lineHeight = (metrics.Descent - metrics.Ascent + metrics.Leading) * 1.02f;
-                var totalHeight = lineHeight * lines.Count;
-                var widest = lines.Count == 0 ? 0 : lines.Max(line => paint.MeasureText(line));
+                finalMetrics = paint.FontMetrics;
+                finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
+                blockHeight = finalLineHeight * lines.Count;
+                widest = lines.Count == 0 ? 0 : lines.Max(line => paint.MeasureText(line));
 
-                if ((widest <= maxWidth && totalHeight <= maxHeight && lines.Count <= field.MaxLines) ||
+                if ((widest <= maxWidth && blockHeight <= maxHeight && lines.Count <= field.MaxLines) ||
                     fontSize <= field.MinFontSize)
                     break;
 
@@ -569,33 +595,33 @@ public sealed class PdfContractTemplateRenderer(
 
             paint.TextSize = fontSize * Scale;
             lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
-            var finalMetrics = paint.FontMetrics;
-            var finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
-            var blockHeight = finalLineHeight * lines.Count;
+            finalMetrics = paint.FontMetrics;
+            finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
+            blockHeight = finalLineHeight * lines.Count;
+            widest = lines.Count == 0 ? 0 : lines.Max(line => paint.MeasureText(line));
 
-            var top = field.VerticalAlignment.Equals("Top", StringComparison.OrdinalIgnoreCase)
-                ? 0.5f * Scale
-                : field.VerticalAlignment.Equals("Bottom", StringComparison.OrdinalIgnoreCase)
-                    ? pixelHeight - blockHeight - 0.5f * Scale
-                    : (pixelHeight - blockHeight) / 2f;
+            var pixelWidth = Math.Max(1, (int)Math.Ceiling(widest + (PaddingX * 2f * Scale)));
+            var pixelHeight = Math.Max(1, (int)Math.Ceiling(blockHeight + (PaddingY * 2f * Scale)));
 
-            var baseline = top - finalMetrics.Ascent;
+            using var bitmap = new SKBitmap(
+                pixelWidth,
+                pixelHeight,
+                SKColorType.Bgra8888,
+                SKAlphaType.Premul);
+            using var canvas = new SKCanvas(bitmap);
+            canvas.Clear(SKColors.Transparent);
+
+            var baseline = (PaddingY * Scale) - finalMetrics.Ascent;
+            var drawX = PaddingX * Scale;
             foreach (var line in lines)
             {
-                var lineWidth = paint.MeasureText(line);
-                var x = field.Alignment.Equals("Center", StringComparison.OrdinalIgnoreCase)
-                    ? (pixelWidth - lineWidth) / 2f
-                    : field.Alignment.Equals("Right", StringComparison.OrdinalIgnoreCase)
-                        ? pixelWidth - lineWidth - Scale
-                        : Scale;
-
-                canvas.DrawText(line, x, baseline, paint);
+                canvas.DrawText(line, drawX, baseline, paint);
                 baseline += finalLineHeight;
             }
 
             using var image = SKImage.FromBitmap(bitmap);
             using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-            return data.ToArray();
+            return new RenderedTextImage(data.ToArray(), pixelWidth / Scale, pixelHeight / Scale);
         }
 
         private static SKTypeface ResolveTypeface(
@@ -628,8 +654,9 @@ public sealed class PdfContractTemplateRenderer(
             int maxLines)
         {
             var normalized = string.Join(" ", value
-                .Replace("\r", " ")
-                .Replace("\n", " ")
+                .Replace("", " ")
+                .Replace("
+", " ")
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
             if (string.IsNullOrWhiteSpace(normalized))
@@ -688,5 +715,7 @@ public sealed class PdfContractTemplateRenderer(
 
             return low <= 0 ? ellipsis : value[..low].TrimEnd() + ellipsis;
         }
+
+        public sealed record RenderedTextImage(byte[] PngBytes, double WidthPoints, double HeightPoints);
     }
 }
