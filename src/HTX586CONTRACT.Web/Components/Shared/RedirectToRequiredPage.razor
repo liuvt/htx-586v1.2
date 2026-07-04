@@ -32,16 +32,6 @@
         var user =
             await UserManager.GetUserAsync(principal);
 
-        if (user?.MustChangePassword == true)
-        {
-            Navigation.NavigateTo(
-                "/account/change-password",
-                forceLoad: true,
-                replace: true);
-
-            return;
-        }
-
         Navigation.NavigateTo(
             "/account/access-denied",
             replace: true);
