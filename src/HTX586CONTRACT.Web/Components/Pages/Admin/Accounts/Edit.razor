@@ -6,7 +6,7 @@
 @inject NavigationManager Navigation
 
 <PageTitle>Cập nhật Admin</PageTitle>
-<PageHeader Title="Cập nhật Admin" Subtitle="Owner chỉnh thông tin Admin, gán CompanyProfile và reset mật khẩu Admin. Owner được tách khỏi luồng này." />
+<PageHeader Title="Cập nhật Admin" Subtitle="Owner chỉnh thông tin Admin, gán Công ty/văn phòng và reset mật khẩu Admin. Owner được tách khỏi luồng này." />
 
 @if (_loading)
 {
@@ -39,7 +39,7 @@ else
             <MudItem xs="12" md="4">
                 <MudSelect T="Guid?"
                            @bind-Value="_model.CompanyProfileId"
-                           Label="CompanyProfile"
+                           Label="Công ty/văn phòng"
                            Variant="Variant.Outlined"
                            Clearable="true">
                     @foreach (var company in _companies)

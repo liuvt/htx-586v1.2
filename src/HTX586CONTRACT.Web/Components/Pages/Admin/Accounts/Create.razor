@@ -94,7 +94,7 @@
     {
         if (_model.CompanyProfileId == Guid.Empty)
         {
-            Snackbar.Add("Vui lòng tạo/chọn CompanyProfile trước khi tạo Admin.", Severity.Warning);
+            Snackbar.Add("Vui lòng tạo/chọn Công ty/văn phòng trước khi tạo Admin.", Severity.Warning);
             return;
         }
 
@@ -104,7 +104,7 @@
         {
             var result = await AdminAccountService.CreateAdminAsync(_model);
 
-            Snackbar.Add("Đã tạo Admin và gán CompanyProfile.", Severity.Success);
+            Snackbar.Add("Đã tạo Admin và gán Công ty/văn phòng.", Severity.Success);
             Navigation.NavigateTo($"/admin/accounts/{result.UserId}");
         }
         catch (Exception ex)

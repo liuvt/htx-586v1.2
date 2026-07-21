@@ -14,7 +14,7 @@
         <MudItem xs="12" md="4">
             <MudSelect T="Guid?"
                        @bind-Value="_model.CompanyProfileId"
-                       Label="CompanyProfile quản lý xe"
+                       Label="Công ty/văn phòng"
                        Required="true"
                        Variant="Variant.Outlined">
 
@@ -254,7 +254,7 @@
     {
         if (_model.CompanyProfileId is null || _model.CompanyProfileId == Guid.Empty)
         {
-            Snackbar.Add("Vui lòng gán CompanyProfile cho xe.", Severity.Warning);
+            Snackbar.Add("Vui lòng gán Công ty/văn phòng cho xe.", Severity.Warning);
             return false;
         }
 
@@ -269,7 +269,7 @@
             !_drivers.Any(x => x.Id == _model.AssignedDriverId &&
                                x.CompanyProfileId == _model.CompanyProfileId))
         {
-            Snackbar.Add("Tài xế được giao xe phải thuộc cùng CompanyProfile với xe.", Severity.Warning);
+            Snackbar.Add("Tài xế được giao xe phải thuộc cùng Công ty/văn phòng với xe.", Severity.Warning);
             return false;
         }
 

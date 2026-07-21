@@ -218,7 +218,7 @@ else
 
             if (_detail is not null && !_canChooseCompany && _detail.CompanyProfileId != _allowedCompanyId)
             {
-                Snackbar.Add("Admin chỉ được quản lý tài xế thuộc CompanyProfile được gán.", Severity.Error);
+                Snackbar.Add("Admin chỉ được quản lý tài xế thuộc Công ty/văn phòng được gán.", Severity.Error);
                 Navigation.NavigateTo("/admin/driver-accounts");
                 _detail = null;
                 return;

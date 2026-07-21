@@ -5,7 +5,7 @@
 @inject NavigationManager Navigation
 
 <PageTitle>Chi tiết Admin</PageTitle>
-<PageHeader Title="Chi tiết Admin" Subtitle="Xem thông tin tài khoản Admin và CompanyProfile được gán." />
+<PageHeader Title="Chi tiết Admin" Subtitle="Xem thông tin tài khoản Admin và Công ty/văn phòng được gán." />
 
 @if (_loading)
 {
@@ -30,7 +30,7 @@ else
             </MudItem>
 
             <MudItem xs="12" md="4">
-                <MudText Typo="Typo.caption">CompanyProfile</MudText>
+                <MudText Typo="Typo.caption">Công ty/văn phòng</MudText>
                 <MudText>@Display(_model.CompanyName)</MudText>
             </MudItem>
 

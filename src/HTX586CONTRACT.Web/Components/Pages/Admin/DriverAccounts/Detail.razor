@@ -250,7 +250,7 @@ else
 
                 if (_detail.CompanyProfileId != allowedCompanyId)
                 {
-                    Snackbar.Add("Admin chỉ được xem tài xế thuộc CompanyProfile được gán.", Severity.Error);
+                    Snackbar.Add("Admin chỉ được xem tài xế thuộc Công ty/văn phòng được gán.", Severity.Error);
                     Navigation.NavigateTo("/admin/driver-accounts");
                     _detail = null;
                 }
