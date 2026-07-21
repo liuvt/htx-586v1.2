@@ -1,11 +1,12 @@
 using HTX586CONTRACT.Domain.Contracts;
 using HTX586CONTRACT.Domain.Identity;
+using HTX586CONTRACT.Domain.Vehicles;
 
 namespace HTX586CONTRACT.Domain.Companies;
 
 /// <summary>
-/// Danh mục đơn vị/văn phòng đại diện. CompanyProfile được tạo khi Owner tạo Admin,
-/// sau đó được gán cho Admin/Driver để lấy đúng thông tin và chữ ký trên Contract.
+/// Danh mục đơn vị/văn phòng đại diện được Owner quản lý độc lập.
+/// Một CompanyProfile có thể gán cho nhiều Admin/Driver và nhiều xe để lấy đúng thông tin/chữ ký trên Contract.
 /// </summary>
 public class CompanyProfile
 {
@@ -35,8 +36,9 @@ public class CompanyProfile
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
-    // Một đơn vị đại diện có thể được gán cho nhiều tài khoản Admin/Driver.
-    public ICollection<ApplicationUser> Drivers { get; set; } = [];
+    // Một CompanyProfile có thể được gán cho nhiều Admin/Driver và nhiều xe.
+    public ICollection<ApplicationUser> Users { get; set; } = [];
+    public ICollection<Vehicle> Vehicles { get; set; } = [];
 
     // Hợp đồng lưu CompanyProfileId để xác định đơn vị đại diện tại thời điểm lập.
     public ICollection<Contract> Contracts { get; set; } = [];

@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using HTX586CONTRACT.Web.Options;
+using HTX586CONTRACT.Application.Common;
 using Microsoft.Extensions.Options;
 
 namespace HTX586CONTRACT.Web.Services;
@@ -54,13 +54,14 @@ public sealed class LocalUploadFileStorage(
         if (string.IsNullOrWhiteSpace(prefix))
             prefix = "signature";
 
-        var bytes = DecodeDataUrl(dataUrl);
+        var decoded = DecodeDataUrl(dataUrl);
+        var bytes = decoded.Bytes;
         if (bytes.Length == 0 || bytes.Length > MaxSignatureBytes)
             throw new InvalidOperationException("Dung lượng chữ ký không hợp lệ hoặc vượt quá 2 MB.");
 
         var safePrefix = SafeSegment(prefix);
         var safeFolderSegments = folderSegments.Select(SafeSegment).ToArray();
-        var fileName = $"{safePrefix}-{Guid.NewGuid():N}.png";
+        var fileName = $"{safePrefix}-{Guid.NewGuid():N}.{decoded.Extension}";
         var physicalDirectory = GetPhysicalDirectory(safeFolderSegments);
 
         Directory.CreateDirectory(physicalDirectory);
@@ -161,20 +162,34 @@ public sealed class LocalUploadFileStorage(
         }
     }
 
-    private static byte[] DecodeDataUrl(string dataUrl)
+    private static (byte[] Bytes, string Extension) DecodeDataUrl(string dataUrl)
     {
         var comma = dataUrl.IndexOf(',');
         if (comma < 0)
             throw new InvalidOperationException("Dữ liệu chữ ký không hợp lệ.");
 
         var header = dataUrl[..comma];
-        if (!header.Contains("image/png", StringComparison.OrdinalIgnoreCase) &&
-            !header.Contains("image/", StringComparison.OrdinalIgnoreCase))
+        string extension;
+        if (header.Contains("image/png", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = "png";
+        }
+        else if (header.Contains("image/jpeg", StringComparison.OrdinalIgnoreCase) || header.Contains("image/jpg", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = "jpg";
+        }
+        else if (header.Contains("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = "png";
+        }
+        else
+        {
             throw new InvalidOperationException("Chữ ký phải là dữ liệu ảnh.");
+        }
 
         try
         {
-            return Convert.FromBase64String(dataUrl[(comma + 1)..]);
+            return (Convert.FromBase64String(dataUrl[(comma + 1)..]), extension);
         }
         catch (FormatException)
         {

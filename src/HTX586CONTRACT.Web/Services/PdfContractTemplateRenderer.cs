@@ -240,6 +240,7 @@ public sealed class PdfContractTemplateRenderer(
 
     private Dictionary<string, string> BuildTextValues(Contract contract)
     {
+        var snapshot = ContractSnapshotData.FromJson(contract.ContractDataJson);
         var company = contract.CompanyProfile;
         var customer = contract.Customer;
         var vehicle = contract.Vehicle;
@@ -247,25 +248,50 @@ public sealed class PdfContractTemplateRenderer(
         var contractDate = VietnamTime(contract.CreatedAt);
         var passengerCount = contract.Passengers.Count(x => !string.IsNullOrWhiteSpace(x.FullName));
 
-        var companyName = First(company?.CompanyName, contract.CompanyNameSnapshot, "...");
-        var customerName = First(
-            customer?.OrganizationName,
-            customer?.FullName,
-            contract.CustomerNameSnapshot,
-            "...");
-        var customerRepresentative = First(customer?.FullName, contract.CustomerNameSnapshot, "...");
-        var ownerName = First(vehicle?.OwnerName, contract.VehicleOwnerNameSnapshot, "...");
-        var driverName = First(driver?.FullName, contract.DriverNameSnapshot, "...");
-        var vehicleBrandModel = First(
-            string.Join(" ", new[] { vehicle?.Brand, vehicle?.Model }
-                .Where(x => !string.IsNullOrWhiteSpace(x))),
-            contract.VehicleBrandSnapshot,
-            "...");
+        // Một khi snapshot tồn tại, chỉ đọc dữ liệu từ snapshot. Không fallback sang
+        // navigation hiện tại, kể cả khi trường lịch sử đang trống.
+        var companyName = snapshot is not null
+            ? First(snapshot.Company.Name, "...")
+            : First(contract.CompanyNameSnapshot, company?.CompanyName, "...");
+        var companyOfficeName = snapshot is not null
+            ? First(snapshot.Company.DisplayName, "...")
+            : company is null
+                ? companyName
+                : First(string.IsNullOrWhiteSpace(company.BranchName)
+                    ? company.CompanyName
+                    : $"{company.CompanyName} - {company.BranchName}", companyName);
+        var customerName = snapshot is not null
+            ? First(snapshot.Customer.OrganizationName, snapshot.Customer.FullName, "...")
+            : First(contract.CustomerNameSnapshot, customer?.OrganizationName, customer?.FullName, "...");
+        var customerRepresentative = snapshot is not null
+            ? First(snapshot.Customer.FullName, "...")
+            : First(contract.CustomerNameSnapshot, customer?.FullName, "...");
+        var ownerName = snapshot is not null
+            ? First(snapshot.Vehicle.OwnerName, "...")
+            : First(contract.VehicleOwnerNameSnapshot, vehicle?.OwnerName, "...");
+        var driverName = snapshot is not null
+            ? First(snapshot.Driver.FullName, "...")
+            : First(contract.DriverNameSnapshot, driver?.FullName, "...");
+        var vehicleBrandModel = snapshot is not null
+            ? First(snapshot.Vehicle.BrandModel, "...")
+            : First(
+                contract.VehicleBrandSnapshot,
+                string.Join(" ", new[] { vehicle?.Brand, vehicle?.Model, vehicle?.VehicleType }
+                    .Where(x => !string.IsNullOrWhiteSpace(x))),
+                "...");
+
+        string FrozenText(string? snapshotValue, params string?[] legacyValues)
+            => snapshot is not null
+                ? First(snapshotValue, "...")
+                : First(legacyValues);
+
+        DateTime? FrozenDate(DateTime? snapshotValue, DateTime? legacyValue)
+            => snapshot is not null ? snapshotValue : legacyValue;
 
         var values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["CONTRACT_NUMBER"] = First(contract.ContractNumber, "..."),
-            ["CONTRACT_TIME"] = contractDate.ToString("HH 'giờ' mm 'phút'", CultureInfo.GetCultureInfo("vi-VN")),
+            ["CONTRACT_TIME"] = contractDate.ToString("HH:mm", CultureInfo.InvariantCulture),
             ["CONTRACT_DAY"] = contractDate.ToString("dd"),
             ["CONTRACT_MONTH"] = contractDate.ToString("MM"),
             ["CONTRACT_YEAR"] = contractDate.ToString("yyyy"),
@@ -275,50 +301,54 @@ public sealed class PdfContractTemplateRenderer(
                 $"ngày {contractDate:dd} tháng {contractDate:MM} năm {contractDate:yyyy})",
 
             ["COMPANY_NAME"] = companyName,
-            ["COMPANY_OFFICE_NAME"] = First(company?.BranchName, companyName),
-            ["COMPANY_TAX_CODE"] = First(company?.TaxCode, contract.CompanyTaxCodeSnapshot, "..."),
-            ["COMPANY_LICENSE"] = First(company?.BusinessLicenseNumber, "..."),
-            ["COMPANY_ADDRESS"] = First(company?.Address, contract.CompanyAddressSnapshot, "..."),
-            ["COMPANY_PHONE"] = First(company?.PhoneNumber, "..."),
-            ["COMPANY_REPRESENTATIVE"] = First(
-                company?.RepresentativeName,
+            ["COMPANY_OFFICE_NAME"] = companyOfficeName,
+            ["COMPANY_TAX_CODE"] = FrozenText(snapshot?.Company.TaxCode, contract.CompanyTaxCodeSnapshot, company?.TaxCode, "..."),
+            ["COMPANY_LICENSE"] = FrozenText(snapshot?.Company.BusinessLicenseNumber, company?.BusinessLicenseNumber, "..."),
+            ["COMPANY_ADDRESS"] = FrozenText(snapshot?.Company.Address, contract.CompanyAddressSnapshot, company?.Address, "..."),
+            ["COMPANY_PHONE"] = FrozenText(snapshot?.Company.PhoneNumber, company?.PhoneNumber, "..."),
+            ["COMPANY_REPRESENTATIVE"] = FrozenText(
+                snapshot?.Company.RepresentativeName,
                 contract.CompanyRepresentativeSnapshot,
+                company?.RepresentativeName,
                 "..."),
-            ["COMPANY_REP_CITIZEN_ID"] = First(company?.RepresentativeCitizenId, "..."),
-            ["COMPANY_REP_ISSUED_DATE"] = FormatDateOnly(company?.RepresentativeCitizenIdIssuedDate),
-            ["COMPANY_REP_ISSUED_PLACE"] = First(company?.RepresentativeCitizenIdIssuedPlace, "..."),
-            ["COMPANY_REP_POSITION"] = First(
-                company?.RepresentativePosition,
+            ["COMPANY_REP_CITIZEN_ID"] = FrozenText(snapshot?.Company.RepresentativeCitizenId, company?.RepresentativeCitizenId, "..."),
+            ["COMPANY_REP_ISSUED_DATE"] = FormatDateOnly(FrozenDate(snapshot?.Company.RepresentativeCitizenIdIssuedDate, company?.RepresentativeCitizenIdIssuedDate)),
+            ["COMPANY_REP_ISSUED_PLACE"] = FrozenText(snapshot?.Company.RepresentativeCitizenIdIssuedPlace, company?.RepresentativeCitizenIdIssuedPlace, "..."),
+            ["COMPANY_REP_POSITION"] = FrozenText(
+                snapshot?.Company.RepresentativePosition,
                 contract.CompanyRepresentativePositionSnapshot,
+                company?.RepresentativePosition,
                 "..."),
 
             ["OWNER_NAME"] = ownerName,
-            ["OWNER_CITIZEN_ID"] = First(
-                vehicle?.OwnerCitizenId,
+            ["OWNER_CITIZEN_ID"] = FrozenText(
+                snapshot?.Vehicle.OwnerCitizenId,
                 contract.VehicleOwnerCitizenIdSnapshot,
+                vehicle?.OwnerCitizenId,
                 "..."),
-            ["OWNER_ISSUED_DATE"] = FormatDateOnly(vehicle?.OwnerCitizenIdIssuedDate),
-            ["OWNER_ISSUED_PLACE"] = First(vehicle?.OwnerCitizenIdIssuedPlace, "..."),
+            ["OWNER_ISSUED_DATE"] = FormatDateOnly(FrozenDate(snapshot?.Vehicle.OwnerCitizenIdIssuedDate, vehicle?.OwnerCitizenIdIssuedDate)),
+            ["OWNER_ISSUED_PLACE"] = FrozenText(snapshot?.Vehicle.OwnerCitizenIdIssuedPlace, vehicle?.OwnerCitizenIdIssuedPlace, "..."),
 
             ["CUSTOMER_NAME"] = customerName,
-            ["CUSTOMER_TAX_CODE"] = First(customer?.TaxCode, "..."),
-            ["CUSTOMER_PHONE"] = First(customer?.PhoneNumber, contract.CustomerPhoneSnapshot, "..."),
-            ["CUSTOMER_ADDRESS"] = First(customer?.Address, contract.CustomerAddressSnapshot, "..."),
-            ["CUSTOMER_CITIZEN_ID"] = First(customer?.CitizenId, contract.CustomerCitizenIdSnapshot, "..."),
-            ["CUSTOMER_ISSUED_DATE"] = FormatDateOnly(customer?.CitizenIdIssuedDate),
-            ["CUSTOMER_ISSUED_PLACE"] = First(customer?.CitizenIdIssuedPlace, "..."),
+            ["CUSTOMER_TAX_CODE"] = FrozenText(snapshot?.Customer.TaxCode, customer?.TaxCode, "..."),
+            ["CUSTOMER_PHONE"] = FrozenText(snapshot?.Customer.PhoneNumber, contract.CustomerPhoneSnapshot, customer?.PhoneNumber, "..."),
+            ["CUSTOMER_ADDRESS"] = FrozenText(snapshot?.Customer.Address, contract.CustomerAddressSnapshot, customer?.Address, "..."),
+            ["CUSTOMER_CITIZEN_ID"] = FrozenText(snapshot?.Customer.CitizenId, contract.CustomerCitizenIdSnapshot, customer?.CitizenId, "..."),
+            ["CUSTOMER_ISSUED_DATE"] = FormatDateOnly(FrozenDate(snapshot?.Customer.CitizenIdIssuedDate, customer?.CitizenIdIssuedDate)),
+            ["CUSTOMER_ISSUED_PLACE"] = FrozenText(snapshot?.Customer.CitizenIdIssuedPlace, customer?.CitizenIdIssuedPlace, "..."),
             ["CUSTOMER_REPRESENTATIVE"] = customerRepresentative,
 
-            ["VEHICLE_PLATE"] = First(vehicle?.PlateNumber, contract.VehiclePlateSnapshot, "..."),
+            ["VEHICLE_PLATE"] = FrozenText(snapshot?.Vehicle.PlateNumber, contract.VehiclePlateSnapshot, vehicle?.PlateNumber, "..."),
             ["VEHICLE_BRAND_MODEL"] = vehicleBrandModel,
-            ["SEAT_COUNT"] = vehicle?.SeatCount?.ToString(CultureInfo.InvariantCulture) ?? "...",
+            ["SEAT_COUNT"] = (snapshot is not null ? snapshot.Vehicle.SeatCount : vehicle?.SeatCount)?.ToString(CultureInfo.InvariantCulture) ?? "...",
             ["PASSENGER_COUNT"] = passengerCount.ToString(CultureInfo.InvariantCulture),
             ["PASSENGER_COUNT_2D"] = passengerCount.ToString("00", CultureInfo.InvariantCulture),
 
             ["DRIVER_NAME"] = driverName,
-            ["DRIVER_LICENSE_CLASS"] = First(
-                driver?.DriverLicenseClass,
+            ["DRIVER_LICENSE_CLASS"] = FrozenText(
+                snapshot?.Driver.DriverLicenseClass,
                 contract.DriverLicenseClassSnapshot,
+                driver?.DriverLicenseClass,
                 "..."),
             ["SECOND_DRIVER_NAME"] = First(contract.SecondDriverName, "Không có"),
             ["SECOND_DRIVER_LICENSE_CLASS"] = First(contract.SecondDriverLicenseClass, "-"),
@@ -333,7 +363,11 @@ public sealed class PdfContractTemplateRenderer(
             ["PAYMENT_TIME"] = First(contract.PaymentTime, "..."),
             ["CONTRACT_NOTE"] = First(contract.Note, "Không có"),
 
-            ["SIG_OFFICE_NAME"] = First(company?.RepresentativeName, contract.CompanyRepresentativeSnapshot, "..."),
+            ["SIG_OFFICE_NAME"] = FrozenText(
+                snapshot?.Company.RepresentativeName,
+                contract.CompanyRepresentativeSnapshot,
+                company?.RepresentativeName,
+                "..."),
             ["SIG_OWNER_NAME"] = ownerName,
             ["SIG_CUSTOMER_NAME"] = SignatureName(contract, SignatureParty.Customer, customerRepresentative),
             ["SIG_DRIVER_NAME"] = driverName,
@@ -359,17 +393,27 @@ public sealed class PdfContractTemplateRenderer(
     }
 
     private Dictionary<string, string?> BuildImageValues(Contract contract)
-        => new(StringComparer.Ordinal)
+    {
+        var snapshot = ContractSnapshotData.FromJson(contract.ContractDataJson);
+        return new Dictionary<string, string?>(StringComparer.Ordinal)
         {
-            // Chữ ký cố định lấy từ danh mục Company/Vehicle/User.
-            ["SIG_OFFICE"] = StoredSignaturePath(contract.CompanyProfile?.RepresentativeSignatureFileUrl),
-            ["SIG_OWNER"] = StoredSignaturePath(contract.Vehicle?.OwnerSignatureFileUrl),
-            ["SIG_DRIVER"] = StoredSignaturePath(contract.Driver?.DriverSignatureFileUrl),
+            // Chữ ký cố định cũng được khóa theo snapshot của hợp đồng. File master
+            // cũ có tên duy nhất nên vẫn tồn tại ngay cả khi danh mục ký lại.
+            ["SIG_OFFICE"] = StoredSignaturePath(snapshot is not null
+                ? snapshot.Company.RepresentativeSignatureFileUrl
+                : contract.CompanyProfile?.RepresentativeSignatureFileUrl),
+            ["SIG_OWNER"] = StoredSignaturePath(snapshot is not null
+                ? snapshot.Vehicle.OwnerSignatureFileUrl
+                : contract.Vehicle?.OwnerSignatureFileUrl),
+            ["SIG_DRIVER"] = StoredSignaturePath(snapshot is not null
+                ? snapshot.Driver.SignatureFileUrl
+                : contract.Driver?.DriverSignatureFileUrl),
 
-            // Chữ ký khách hàng vẫn là chữ ký theo từng hợp đồng.
+            // Chữ ký khách hàng là dữ liệu riêng của từng hợp đồng.
             ["SIG_CUSTOMER"] = ContractSignaturePath(contract, SignatureParty.Customer),
             ["SIG_CUSTOMER_2"] = ContractSignaturePath(contract, SignatureParty.Customer)
         };
+    }
 
     private string? ContractSignaturePath(Contract contract, SignatureParty party)
         => StoredSignaturePath(contract.Signatures.FirstOrDefault(x => x.Party == party)?.SignatureFileUrl);
@@ -577,16 +621,20 @@ public sealed class PdfContractTemplateRenderer(
             SKFontMetrics finalMetrics;
             float finalLineHeight;
 
+            var maxLines = Math.Max(1, field.MaxLines);
             while (true)
             {
                 paint.TextSize = fontSize * Scale;
-                lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
+
+                // Đo bằng toàn bộ nội dung, chưa cắt dấu ba chấm. Cách cũ cắt chuỗi
+                // trước khi đo nên font không bao giờ được thu nhỏ theo MinFontSize.
+                lines = WrapTextForMeasurement(value, paint, maxWidth);
                 finalMetrics = paint.FontMetrics;
                 finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
                 blockHeight = finalLineHeight * lines.Count;
                 widest = lines.Count == 0 ? 0 : lines.Max(line => paint.MeasureText(line));
 
-                if ((widest <= maxWidth && blockHeight <= maxHeight && lines.Count <= field.MaxLines) ||
+                if ((widest <= maxWidth && blockHeight <= maxHeight && lines.Count <= maxLines) ||
                     fontSize <= field.MinFontSize)
                     break;
 
@@ -594,7 +642,7 @@ public sealed class PdfContractTemplateRenderer(
             }
 
             paint.TextSize = fontSize * Scale;
-            lines = WrapText(value, paint, maxWidth, Math.Max(1, field.MaxLines));
+            lines = WrapText(value, paint, maxWidth, maxLines);
             finalMetrics = paint.FontMetrics;
             finalLineHeight = (finalMetrics.Descent - finalMetrics.Ascent + finalMetrics.Leading) * 1.02f;
             blockHeight = finalLineHeight * lines.Count;
@@ -647,22 +695,14 @@ public sealed class PdfContractTemplateRenderer(
             return SKTypeface.FromFamilyName("sans-serif", style);
         }
 
-        private static List<string> WrapText(
+        private static List<string> WrapTextForMeasurement(
             string value,
             SKPaint paint,
-            float maxWidth,
-            int maxLines)
+            float maxWidth)
         {
-            var normalized = string.Join(" ", value
-                .Replace("\r", " ")
-                .Replace("\n", " ")
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
-
+            var normalized = NormalizeText(value);
             if (string.IsNullOrWhiteSpace(normalized))
                 return [];
-
-            if (maxLines <= 1)
-                return [FitSingleLine(normalized, paint, maxWidth)];
 
             var words = normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var lines = new List<string>();
@@ -680,19 +720,52 @@ public sealed class PdfContractTemplateRenderer(
                 if (!string.IsNullOrEmpty(current))
                     lines.Add(current);
 
+                // Giữ nguyên từ dài để vòng lặp giảm cỡ chữ có thể đo đúng độ tràn.
                 current = word;
-                if (lines.Count == maxLines - 1)
-                    break;
             }
 
-            if (!string.IsNullOrEmpty(current) && lines.Count < maxLines)
+            if (!string.IsNullOrEmpty(current))
                 lines.Add(current);
-
-            if (lines.Count > 0)
-                lines[^1] = FitSingleLine(lines[^1], paint, maxWidth);
 
             return lines;
         }
+
+        private static List<string> WrapText(
+            string value,
+            SKPaint paint,
+            float maxWidth,
+            int maxLines)
+        {
+            var normalized = NormalizeText(value);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return [];
+
+            if (maxLines <= 1)
+                return [FitSingleLine(normalized, paint, maxWidth)];
+
+            var measuredLines = WrapTextForMeasurement(normalized, paint, maxWidth);
+            if (measuredLines.Count <= maxLines)
+                return measuredLines
+                    .Select(line => FitSingleLine(line, paint, maxWidth))
+                    .ToList();
+
+            var result = measuredLines.Take(maxLines).ToList();
+
+            // Không làm mất các từ còn lại. Ghép toàn bộ phần chưa in vào dòng cuối
+            // rồi mới cắt bằng dấu ba chấm nếu tại MinFontSize vẫn không đủ chỗ.
+            result[^1] = FitSingleLine(
+                string.Join(" ", measuredLines.Skip(maxLines - 1)),
+                paint,
+                maxWidth);
+
+            return result;
+        }
+
+        private static string NormalizeText(string value)
+            => string.Join(" ", value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
         private static string FitSingleLine(string value, SKPaint paint, float maxWidth)
         {

@@ -4,6 +4,8 @@ public sealed class UpdateAdminAccountRequest
 {
     public string UserId { get; set; } = string.Empty;
 
+    public Guid? CompanyProfileId { get; set; }
+
     public string FullName { get; set; } = string.Empty;
 
     public string? EmployeeCode { get; set; }

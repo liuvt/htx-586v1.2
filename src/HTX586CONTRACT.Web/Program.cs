@@ -1,17 +1,18 @@
 using HTX586CONTRACT.Application.Abstractions;
+using HTX586CONTRACT.Application.Common;
 using HTX586CONTRACT.Domain.Identity;
 using HTX586CONTRACT.Infrastructure.Identity;
 using HTX586CONTRACT.Infrastructure.Persistence;
 using HTX586CONTRACT.Infrastructure.Services;
 using HTX586CONTRACT.Web.Components;
 using HTX586CONTRACT.Web.Endpoints;
+using HTX586CONTRACT.Web.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
-using HTX586CONTRACT.Web.Services;
-using HTX586CONTRACT.Web.Options;
+
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 
@@ -19,13 +20,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddHubOptions(options =>
+    {
+        // Chữ ký canvas được truyền từ trình duyệt về Blazor Server qua SignalR.
+        // Giữ giới hạn dự phòng cho dữ liệu ảnh đã nén và các thiết bị DPI cao.
+        options.MaximumReceiveMessageSize = 256 * 1024;
+    });
 
 builder.Services.AddMudServices();
 builder.Services.Configure<FileStorageOptions>(
     builder.Configuration.GetSection(FileStorageOptions.SectionName));
 
-var connectionString = builder.Configuration.GetConnectionString("Vps");
+var connectionString = builder.Configuration.GetConnectionString("Default");
 
 // Tương thích ngược với cấu hình cũ nếu server đang dùng key Vps.
 // Các bản deploy IIS/VPS mới nên cấu hình ConnectionStrings:Default.
@@ -128,11 +135,15 @@ builder.Services.AddScoped<
     CompanyProfileService>();
 
 builder.Services.AddScoped<IContractService, ContractService>();
+builder.Services.AddScoped<IDriverNotificationService, DriverNotificationService>();
 builder.Services.AddSingleton<IUploadFileStorage, LocalUploadFileStorage>();
 builder.Services.AddSingleton<PdfContractTemplateRenderer>();
 builder.Services.AddScoped<PdfLayoutDesignerService>();
 builder.Services.AddScoped<MasterSignatureService>();
+builder.Services.AddScoped<DriverRegistrationNotificationState>();
+builder.Services.AddScoped<DriverNotificationState>();
 builder.Services.AddScoped<IContractDocumentService, ContractDocumentService>();
+builder.Services.AddScoped<IExcelReportService, ExcelReportService>();
 
 var app = builder.Build();
 
@@ -199,5 +210,6 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAccountEndpoints();
+app.MapReportEndpoints();
 await DatabaseSeeder.SeedAsync(app.Services);
 app.Run();

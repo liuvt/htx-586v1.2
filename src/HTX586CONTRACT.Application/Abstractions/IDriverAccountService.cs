@@ -1,4 +1,6 @@
 ﻿using HTX586CONTRACT.Application.Admins.DriverAccounts;
+using HTX586CONTRACT.Application.Common;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace HTX586CONTRACT.Application.Abstractions;
 
@@ -7,6 +9,13 @@ public interface IDriverAccountService
     Task<string> CreateAsync(
         CreateDriverAccountRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<string> SubmitRegistrationAsync(SelfRegisterDriverRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<DriverRegistrationRequestDto>> GetPendingRegistrationsAsync(CancellationToken cancellationToken = default);
+    Task<int> GetUnseenPendingRegistrationCountAsync(CancellationToken cancellationToken = default);
+    Task<DriverRegistrationRequestDto?> GetRegistrationDetailAsync(string userId, CancellationToken cancellationToken = default);
+    Task MarkRegistrationViewedAsync(string userId, string viewerUserId, CancellationToken cancellationToken = default);
+    Task ReviewRegistrationAsync(string userId, bool approve, string? note, string reviewerUserId, CancellationToken cancellationToken = default);
 
     Task UpdateAsync(
         string userId,

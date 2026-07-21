@@ -20,7 +20,9 @@ public sealed class CompanyProfileDto
     public string? RepresentativeSignatureFileUrl { get; set; }
     public DateTime? RepresentativeSignedAt { get; set; }
     public bool IsActive { get; set; }
+    public int AdminCount { get; set; }
     public int DriverCount { get; set; }
+    public int VehicleCount { get; set; }
     public int ContractCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

@@ -8,6 +8,7 @@ public sealed class ContractFilter
     public ContractStatus? Status { get; set; }
     public ContractBusinessType? BusinessType { get; set; }
     public string? DriverId { get; set; }
+    public Guid? CompanyProfileId { get; set; }
     public DateTime? FromDate { get; set; }
     public DateTime? ToDate { get; set; }
 }
@@ -33,15 +34,22 @@ public sealed class ContractSignatureDto
 public sealed class ContractDetailDto
 {
     public Guid Id { get; set; }
+    // Số hợp đồng
     public string ContractNumber { get; set; } = string.Empty;
+    // Loại HĐ
     public ContractBusinessType BusinessType { get; set; }
     public Guid ContractTypeId { get; set; }
     public ContractStatus Status { get; set; }
     public Guid CompanyProfileId { get; set; }
     public string CompanyName { get; set; } = string.Empty;
+    public string? CompanyRepresentativeName { get; set; }
+    public string? CompanyRepresentativeSignatureFileUrl { get; set; }
+    public DateTime? CompanyRepresentativeSignedAt { get; set; }
     public string DriverId { get; set; } = string.Empty;
     public string DriverName { get; set; } = string.Empty;
     public string? DriverLicenseClass { get; set; }
+    public string? DriverSignatureFileUrl { get; set; }
+    public DateTime? DriverSignedAt { get; set; }
     public Guid CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string CustomerPhone { get; set; } = string.Empty;
@@ -57,6 +65,8 @@ public sealed class ContractDetailDto
     public string? OwnerName { get; set; }
     public string? OwnerCitizenId { get; set; }
     public DateTime? OwnerCitizenIdIssuedDate { get; set; }
+    public string? VehicleOwnerSignatureFileUrl { get; set; }
+    public DateTime? VehicleOwnerSignedAt { get; set; }
     public string? CargoName { get; set; }
     public decimal? CargoWeight { get; set; }
     public string? CargoUnit { get; set; }
@@ -74,6 +84,11 @@ public sealed class ContractDetailDto
     public string? Note { get; set; }
     public string? PdfFileUrl { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? CreatedByUserId { get; set; }
+    public string CreatedByName { get; set; } = "Hệ thống";
+    public string? AssignedByUserId { get; set; }
+    public string? AssignedByName { get; set; }
+    public DateTime? AssignedAt { get; set; }
     public List<ContractPassengerDto> Passengers { get; set; } = [];
     public List<ContractSignatureDto> Signatures { get; set; } = [];
 }
@@ -82,8 +97,9 @@ public sealed class SaveContractRequest
 {
     public Guid? Id { get; set; }
     public string? ContractNumber { get; set; }
-    public ContractBusinessType BusinessType { get; set; } = ContractBusinessType.Driver;
+    public ContractBusinessType BusinessType { get; set; } = ContractBusinessType.Passenger;
     public Guid? ContractTypeId { get; set; }
+    public Guid? CompanyProfileId { get; set; }
     public string DriverId { get; set; } = string.Empty;
     public Guid? CustomerId { get; set; }
     public string CustomerName { get; set; } = string.Empty;

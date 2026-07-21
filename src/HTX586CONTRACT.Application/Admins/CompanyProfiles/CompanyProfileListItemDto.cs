@@ -11,7 +11,9 @@ public sealed class CompanyProfileListItemDto
     public string RepresentativeName { get; set; } = string.Empty;
     public string? RepresentativeSignatureFileUrl { get; set; }
     public bool IsActive { get; set; }
+    public int AdminCount { get; set; }
     public int DriverCount { get; set; }
+    public int VehicleCount { get; set; }
     public int ContractCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }

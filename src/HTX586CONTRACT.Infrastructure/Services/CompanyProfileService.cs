@@ -2,12 +2,20 @@ using HTX586CONTRACT.Application.Abstractions;
 using HTX586CONTRACT.Application.Admins.CompanyProfiles;
 using HTX586CONTRACT.Domain.Companies;
 using HTX586CONTRACT.Infrastructure.Persistence;
+using HTX586CONTRACT.Application.Common;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 
 namespace HTX586CONTRACT.Infrastructure.Services;
-
-public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext> factory) : ICompanyProfileService
+public sealed class CompanyProfileService(
+    IDbContextFactory<ApplicationDbContext> factory,
+    IHostEnvironment environment,
+    IOptions<FileStorageOptions> fileStorageOptions) : ICompanyProfileService
 {
+
     public async Task<IReadOnlyList<CompanyProfileListItemDto>> GetListAsync(CompanyProfileFilter filter, CancellationToken ct = default)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -45,7 +53,9 @@ public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext
                 RepresentativeName = x.RepresentativeName,
                 RepresentativeSignatureFileUrl = x.RepresentativeSignatureFileUrl,
                 IsActive = x.IsActive,
+                AdminCount = db.Users.Count(u => u.CompanyProfileId == x.Id && db.UserRoles.Any(ur => ur.UserId == u.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Admin"))),
                 DriverCount = db.Users.Count(u => u.CompanyProfileId == x.Id && db.UserRoles.Any(ur => ur.UserId == u.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Driver"))),
+                VehicleCount = db.Vehicles.Count(v => v.CompanyProfileId == x.Id),
                 ContractCount = x.Contracts.Count,
                 CreatedAt = x.CreatedAt
             })
@@ -77,7 +87,9 @@ public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext
                 RepresentativeSignatureFileUrl = x.RepresentativeSignatureFileUrl,
                 RepresentativeSignedAt = x.RepresentativeSignedAt,
                 IsActive = x.IsActive,
+                AdminCount = db.Users.Count(u => u.CompanyProfileId == x.Id && db.UserRoles.Any(ur => ur.UserId == u.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Admin"))),
                 DriverCount = db.Users.Count(u => u.CompanyProfileId == x.Id && db.UserRoles.Any(ur => ur.UserId == u.Id && db.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Driver"))),
+                VehicleCount = db.Vehicles.Count(v => v.CompanyProfileId == x.Id),
                 ContractCount = x.Contracts.Count,
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt
@@ -139,7 +151,9 @@ public sealed class CompanyProfileService(IDbContextFactory<ApplicationDbContext
             ?? throw new KeyNotFoundException("Không tìm thấy công ty/văn phòng đại diện.");
 
         if (await db.Users.AnyAsync(x => x.CompanyProfileId == id, ct))
-            throw new InvalidOperationException("Không thể xóa vì đơn vị đang được gán cho tài khoản Admin/Driver.");
+            throw new InvalidOperationException("Không thể xóa vì CompanyProfile đang được gán cho tài khoản Admin/Driver.");
+        if (await db.Vehicles.AnyAsync(x => x.CompanyProfileId == id, ct))
+            throw new InvalidOperationException("Không thể xóa vì CompanyProfile đang được gán cho xe.");
         if (await db.Contracts.AnyAsync(x => x.CompanyProfileId == id, ct))
             throw new InvalidOperationException("Không thể xóa vì đơn vị đã được sử dụng trong hợp đồng.");
 
