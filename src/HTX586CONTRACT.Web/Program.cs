@@ -154,9 +154,51 @@ if (forwardedHeadersEnabled)
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/error");
+    app.UseExceptionHandler("/error/500");
     app.UseHsts();
 }
+
+// Giữ người dùng trong giao diện HTX586 khi truy cập URL không tồn tại
+// hoặc endpoint trả về lỗi truy cập. Chỉ chuyển hướng request HTML để
+// không làm thay đổi phản hồi của file tĩnh, SignalR và endpoint dữ liệu.
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var httpContext = statusCodeContext.HttpContext;
+    var request = httpContext.Request;
+    var response = httpContext.Response;
+    var statusCode = response.StatusCode;
+
+    if (statusCode is not (401 or 403 or 404 or 408 or 500 or 503) ||
+        (!HttpMethods.IsGet(request.Method) &&
+         !HttpMethods.IsHead(request.Method)) ||
+        request.Path.StartsWithSegments("/error") ||
+        request.Path.StartsWithSegments("/account/access-denied"))
+    {
+        return;
+    }
+
+    var acceptsHtml =
+        request.Headers.Accept.Count == 0 ||
+        request.Headers.Accept.Any(value =>
+            value?.Contains(
+                "text/html",
+                StringComparison.OrdinalIgnoreCase) == true);
+
+    if (!acceptsHtml)
+        return;
+
+    var originalUrl = string.Concat(
+        request.PathBase.Value,
+        request.Path.Value,
+        request.QueryString.Value);
+
+    var errorUrl =
+        $"/error/{statusCode}?ReturnUrl={Uri.EscapeDataString(originalUrl)}";
+
+    response.Redirect(errorUrl);
+
+    await Task.CompletedTask;
+});
 
 app.UseHttpsRedirection();
 

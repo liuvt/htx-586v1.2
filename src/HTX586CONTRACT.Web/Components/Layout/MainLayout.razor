@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @using HTX586CONTRACT.Web.Themes
+@inject NavigationManager Navigation
 
 <MudThemeProvider Theme="_theme" />
 <MudPopoverProvider />
@@ -86,7 +88,14 @@
     <MudMainContent Class="workspace-content">
         <CascadingValue Name="OpenChangePassword" Value="@((Func<Task>)OpenChangePasswordAsync)">
             <MudContainer MaxWidth="MaxWidth.False" Class="page-container">
-                @Body
+                <ErrorBoundary @ref="_errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="exception">
+                        <ErrorsPage StatusCode="500" />
+                    </ErrorContent>
+                </ErrorBoundary>
             </MudContainer>
         </CascadingValue>
     </MudMainContent>
@@ -106,6 +115,12 @@
     private readonly MudTheme _theme = AppMudTheme.Create();
     private bool _drawerOpen = true;
     private ForcePasswordChangeOverlay? _forcePasswordChangeOverlay;
+    private ErrorBoundary? _errorBoundary;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
@@ -113,5 +128,24 @@
     {
         if (_forcePasswordChangeOverlay is not null)
             await _forcePasswordChangeOverlay.ShowAsync();
+    }
+
+    private async void OnLocationChanged(
+        object? sender,
+        LocationChangedEventArgs args)
+    {
+        try
+        {
+            await InvokeAsync(() => _errorBoundary?.Recover());
+        }
+        catch
+        {
+            // Không làm gián đoạn điều hướng nếu ErrorBoundary đã được giải phóng.
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

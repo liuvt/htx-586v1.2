@@ -10,7 +10,7 @@
 @inject IDialogService Dialog
 
 <PageTitle>@(Id.HasValue ? "Chi tiết hợp đồng" : "Tạo hợp đồng")</PageTitle>
-<PageHeader Title="@(Id.HasValue ? "Chi tiết và ký hợp đồng" : "Tạo hợp đồng cá nhân")" Subtitle="Bố cục hợp đồng thống nhất với Owner/Admin; thông tin hợp đồng, phương tiện và khách hàng được kiểm soát theo nguồn tạo." />
+<PageHeader Title="@(Id.HasValue ? "Hợp đồng vận chuyển" : "Tạo hợp đồng")" />
 
 @if (_loading)
 {
@@ -22,257 +22,135 @@ else if (_driver is null)
 }
 else if (_driver.CompanyProfile is null)
 {
-    <MudAlert Severity="Severity.Warning">Tài khoản chưa được Admin gán Công ty/văn phòng. Không thể tạo hợp đồng.</MudAlert>
+    <MudAlert Severity="Severity.Warning">Tài khoản chưa được gán Công ty/Văn phòng.</MudAlert>
 }
 else if (!Id.HasValue && _vehicles.Count == 0)
 {
-    <MudAlert Severity="Severity.Warning">Tài khoản chưa được gán xe đang hoạt động. Vui lòng liên hệ Owner/Admin để gán phương tiện trước khi tạo hợp đồng.</MudAlert>
+    <MudAlert Severity="Severity.Warning">Tài khoản chưa được gán xe đang hoạt động.</MudAlert>
 }
 else
 {
-    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
-        Văn phòng đại diện: <b>@_driver.CompanyProfile.CompanyName</b> - Người đại diện: @_driver.CompanyProfile.RepresentativeName
-    </MudAlert>
-
     @if (Id.HasValue)
     {
-        <MudPaper Class="pa-3 mb-4 d-flex align-center" Outlined="true">
-            <MudText Typo="Typo.subtitle2" Class="mr-3">Trạng thái hợp đồng:</MudText>
-            <ContractStatusChip Status="_model.Status" ChipSize="Size.Medium" />
+        <MudPaper Class="driver-contract-status pa-3 mb-4" Elevation="0" Outlined="true">
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.subtitle2">@ContractNumberDisplayText</MudText>
+                <MudSpacer />
+                <ContractStatusChip Status="_model.Status" ChipSize="Size.Medium" />
+            </MudStack>
         </MudPaper>
-    }
-
-    @if (Id.HasValue && _detail is not null)
-    {
-        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">
-            <b>Người tạo hợp đồng:</b> @_detail.CreatedByName
-            lúc @VietnamTime(_detail.CreatedAt).ToString("dd/MM/yyyy HH:mm").
-            @if (!string.IsNullOrWhiteSpace(_detail.AssignedByName))
-            {
-                <span> <b>Người phát xuống:</b> @_detail.AssignedByName
-                    @if (_detail.AssignedAt.HasValue)
-                    {
-                        <span> lúc @VietnamTime(_detail.AssignedAt.Value).ToString("dd/MM/yyyy HH:mm")</span>
-                    }
-                    .
-                </span>
-            }
-            else
-            {
-                <span> Hợp đồng do tài xế tự tạo.</span>
-            }
-        </MudAlert>
-
-        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Sau khi hợp đồng đã được tạo hoặc phát xuống, tài xế chỉ được cập nhật
-            <b>Nội dung hợp đồng và Danh sách hành khách</b>, sau đó yêu cầu khách ký để chốt.
-            Thông tin hợp đồng, phương tiện và khách hàng/người thuê bị khóa.
-        </MudAlert>
     }
 
     @if (_model.Status == ContractStatus.Cancelled)
     {
-        <MudAlert Severity="Severity.Error" Variant="Variant.Filled" Class="mb-4">
-            Hợp đồng đã bị hủy và không thể cập nhật hoặc ký thêm.
+        <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mb-4">
+            Hợp đồng đã bị hủy và không thể chỉnh sửa.
         </MudAlert>
     }
     else if (_model.Status == ContractStatus.Completed)
     {
-        <MudAlert Severity="Severity.Success" Variant="Variant.Filled" Class="mb-4">
-            Khách hàng đã xác nhận chữ ký. Hợp đồng đã hoàn tất và toàn bộ nội dung bị khóa, không thể điều chỉnh.
-        </MudAlert>
-    }
-    else if (_model.Status == ContractStatus.Draft)
-    {
-        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Hợp đồng đã được phát xuống. Vui lòng kiểm tra và bổ sung Nội dung hợp đồng,
-            Danh sách hành khách. Bạn có thể bấm <b>Lưu lại</b>, hoặc cho khách ký trực tiếp;
-            khi xác nhận chữ ký hệ thống sẽ tự lưu dữ liệu trước.
-        </MudAlert>
-    }
-    else if (_model.Status == ContractStatus.WaitingCustomerSignature && !_editingContent)
-    {
         <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mb-4">
-            Thông tin đã được lưu. Hợp đồng đang chờ khách hàng ký; nội dung tạm khóa để tránh ký nhầm dữ liệu chưa lưu.
-        </MudAlert>
-    }
-    else if (_model.Status == ContractStatus.WaitingCustomerSignature && _editingContent)
-    {
-        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
-            Bạn đang chỉnh sửa lại Nội dung hợp đồng hoặc Danh sách hành khách.
-            Khi xác nhận chữ ký, hệ thống sẽ tự lưu các thay đổi này trước khi hoàn tất hợp đồng.
+            Hợp đồng đã hoàn tất và được khóa dữ liệu.
         </MudAlert>
     }
 
     <MudForm @ref="_form" @bind-IsValid="_valid">
-        <MudPaper Class="pa-4" Elevation="1">
-            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="border:1px solid var(--mud-palette-lines-default);">
-                <MudText Typo="Typo.h6" Class="mb-3">1. Thông tin hợp đồng</MudText>
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                    Nhóm thông tin này được hệ thống tự động lấy theo tài khoản Driver và cấu hình hợp đồng. Tài xế không được thay đổi.
-                </MudAlert>
-                <MudGrid>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@CompanyDisplayText"
-                                      Label="Công ty/Văn phòng"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
+        <MudPaper Class="pa-4 driver-contract-shell" Elevation="1">
+            <MudPaper Class="pa-4 mb-4 driver-contract-section" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">1. Thông tin cố định</MudText>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="8">
+                        <div class="driver-contract-summary-item">
+                            <MudText Typo="Typo.caption">Công ty/Văn phòng</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="driver-contract-summary-value">@CompanyDisplayText</MudText>
+                        </div>
                     </MudItem>
                     <MudItem xs="12" md="4">
-                        <MudTextField Value="@BusinessTypeDisplayText"
-                                      Label="Loại hợp đồng"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@ContractNumberDisplayText"
-                                      Label="Số hợp đồng"
-                                      HelperText="Hệ thống tự sinh khi tạo hợp đồng mới."
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@(_driver?.FullName ?? string.Empty)"
-                                      Label="Tài xế"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@_model.AreaCode"
-                                      Label="Khu vực"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@ContractSourceDisplayText"
-                                      Label="Nguồn tạo hợp đồng"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
+                        <div class="driver-contract-summary-item">
+                            <MudText Typo="Typo.caption">Biển số xe</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="driver-contract-summary-value driver-contract-plate">@VehiclePlateDisplayText</MudText>
+                        </div>
                     </MudItem>
                 </MudGrid>
             </MudPaper>
 
-            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="border:1px solid var(--mud-palette-lines-default);">
-                <MudText Typo="Typo.h6" Class="mb-3">2. Phương tiện</MudText>
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                    Phương tiện được tự động lấy từ xe đang được Owner/Admin gán cho tài xế. Tài xế không được thay đổi.
-                </MudAlert>
-                <MudGrid>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@(SelectedVehicle?.PlateNumber ?? _detail?.VehiclePlate ?? string.Empty)"
-                                      Label="Biển kiểm soát"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField Value="@VehicleBrandDisplayText"
-                                      Label="Hãng/Loại xe"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudNumericField T="int?" Value="@VehicleSeatCount"
-                                         Label="Số chỗ"
-                                         Variant="Variant.Outlined"
-                                         Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField Value="@(SelectedVehicle?.OwnerName ?? _detail?.OwnerName ?? string.Empty)"
-                                      Label="Chủ sở hữu xe"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField Value="@(SelectedVehicle?.OwnerCitizenId ?? _detail?.OwnerCitizenId ?? string.Empty)"
-                                      Label="CCCD chủ sở hữu"
-                                      Variant="Variant.Outlined"
-                                      Disabled="true" />
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
+            <MudPaper Class="pa-4 mb-4 driver-contract-section" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">2. Khách hàng</MudText>
 
-            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="border:1px solid var(--mud-palette-lines-default);">
-                <MudText Typo="Typo.h6" Class="mb-3">3. Khách hàng/người thuê</MudText>
+                @if (!Id.HasValue)
+                {
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="9">
+                            <MudSelect T="Guid?"
+                                       Value="@_model.CustomerId"
+                                       ValueChanged="SelectCustomer"
+                                       Label="Chọn khách hàng"
+                                       Variant="Variant.Outlined"
+                                       Clearable="true">
+                                @foreach (var customer in _customers)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@((Guid?)customer.Id)">@CustomerDisplay(customer)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3" Class="d-flex align-center">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                       FullWidth="true"
+                                       OnClick="StartNewCustomer">
+                                Khách hàng mới
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
 
-                @if (IsDispatchedContract)
-                {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                        Khách hàng do Owner/Admin chọn khi phát hợp đồng. Tài xế chỉ được xem và không được thay đổi.
-                    </MudAlert>
-                }
-                else if (Id.HasValue)
-                {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                        Khách hàng đã được lưu khi tài xế tạo hợp đồng. Sau khi lưu, chỉ Owner/Admin được quản lý hoặc cập nhật hồ sơ khách hàng này.
-                    </MudAlert>
+                    @if (_creatingNewCustomer)
+                    {
+                        <MudGrid Spacing="2" Class="mt-1">
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.CustomerName"
+                                              Label="Họ tên khách hàng"
+                                              Required="true"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.CustomerPhone"
+                                              Label="Số điện thoại"
+                                              Required="true"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.CustomerCitizenId"
+                                              Label="CCCD/MST"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudTextField @bind-Value="_model.CustomerAddress"
+                                              Label="Địa chỉ"
+                                              Variant="Variant.Outlined" />
+                            </MudItem>
+                        </MudGrid>
+                    }
+                    else
+                    {
+                        <div class="driver-contract-summary-item mt-3">
+                            <MudText Typo="Typo.caption">Khách hàng đã chọn</MudText>
+                            <MudText Typo="Typo.subtitle1" Class="driver-contract-summary-value">@CustomerSummaryText</MudText>
+                        </div>
+                    }
                 }
                 else
                 {
-                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                        Tài xế được chọn khách hàng đã dùng trước đó hoặc nhập khách hàng mới trong lúc tạo hợp đồng. Hồ sơ khách hàng mới sẽ ghi nhận tài xế là người tạo; sau khi lưu chỉ Owner/Admin được quản lý.
-                    </MudAlert>
+                    <div class="driver-contract-summary-item">
+                        <MudText Typo="Typo.caption">Khách hàng/người thuê</MudText>
+                        <MudText Typo="Typo.subtitle1" Class="driver-contract-summary-value">@CustomerSummaryText</MudText>
+                    </div>
                 }
-
-                <MudGrid>
-                    <MudItem xs="12" md="9">
-                        <MudSelect T="Guid?"
-                                   Value="@_model.CustomerId"
-                                   ValueChanged="SelectCustomer"
-                                   Label="Khách hàng đã dùng trước đó"
-                                   Variant="Variant.Outlined"
-                                   Clearable="true"
-                                   Disabled="@(!CanChooseCustomer)">
-                            @foreach (var customer in _customers)
-                            {
-                                <MudSelectItem T="Guid?" Value="@((Guid?)customer.Id)">@CustomerDisplay(customer)</MudSelectItem>
-                            }
-                        </MudSelect>
-                    </MudItem>
-                    <MudItem xs="12" md="3" Class="d-flex align-center">
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.PersonAdd"
-                                   FullWidth="true"
-                                   Disabled="@(!CanCreateNewCustomer)"
-                                   OnClick="StartNewCustomer">
-                            Nhập khách hàng mới
-                        </MudButton>
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField @bind-Value="_model.CustomerName"
-                                      Label="Tên khách hàng/người thuê"
-                                      Required="@CanCreateNewCustomer"
-                                      Variant="Variant.Outlined"
-                                      Disabled="@CustomerFieldsDisabled" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField @bind-Value="_model.CustomerPhone"
-                                      Label="Số điện thoại"
-                                      Required="@CanCreateNewCustomer"
-                                      Variant="Variant.Outlined"
-                                      Disabled="@CustomerFieldsDisabled" />
-                    </MudItem>
-                    <MudItem xs="12" md="4">
-                        <MudTextField @bind-Value="_model.CustomerCitizenId"
-                                      Label="CCCD/MST khách hàng"
-                                      Variant="Variant.Outlined"
-                                      Disabled="@CustomerFieldsDisabled" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="_model.CustomerAddress"
-                                      Label="Địa chỉ khách hàng"
-                                      Variant="Variant.Outlined"
-                                      Disabled="@CustomerFieldsDisabled" />
-                    </MudItem>
-                </MudGrid>
             </MudPaper>
 
-            <MudPaper Class="pa-4 mb-4" Elevation="0" Style="border:1px solid var(--mud-palette-lines-default);">
-                <MudText Typo="Typo.h6" Class="mb-3">4. Nội dung hợp đồng</MudText>
-                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3">
-                    Tài xế được điều chỉnh nội dung chuyến đi trước khi khách hàng ký xác nhận.
-                </MudAlert>
-                <MudGrid>
+            <MudPaper Class="pa-4 mb-4 driver-contract-section" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">3. Nội dung chuyến đi</MudText>
+                <MudGrid Spacing="2">
                     <MudItem xs="12" sm="6" md="3">
                         <MudDatePicker Date="@_startDate"
                                        DateChanged="SetStartDate"
@@ -325,19 +203,19 @@ else
                     </MudItem>
                     <MudItem xs="12">
                         <MudTextField @bind-Value="_model.RouteDescription"
-                                      Label="Lộ trình chi tiết"
-                                      Lines="3"
+                                      Label="Lộ trình"
+                                      Lines="2"
                                       Variant="Variant.Outlined"
                                       Disabled="@IsDriverEditableContentLocked" />
                     </MudItem>
-                    <MudItem xs="12" md="3">
+                    <MudItem xs="12" sm="6" md="3">
                         <MudNumericField T="decimal?"
                                          @bind-Value="_model.TotalKilometers"
                                          Label="Tổng km"
                                          Variant="Variant.Outlined"
                                          Disabled="@IsDriverEditableContentLocked" />
                     </MudItem>
-                    <MudItem xs="12" md="3">
+                    <MudItem xs="12" sm="6" md="3">
                         <MudNumericField T="decimal?"
                                          @bind-Value="_model.ContractValue"
                                          Label="Giá trị hợp đồng"
@@ -345,10 +223,10 @@ else
                                          Variant="Variant.Outlined"
                                          Disabled="@IsDriverEditableContentLocked" />
                     </MudItem>
-                    <MudItem xs="12" md="3">
+                    <MudItem xs="12" sm="6" md="3">
                         <MudSelect T="string"
                                    @bind-Value="_model.PaymentMethod"
-                                   Label="Hình thức thanh toán"
+                                   Label="Thanh toán"
                                    Variant="Variant.Outlined"
                                    Clearable="true"
                                    Disabled="@IsDriverEditableContentLocked">
@@ -356,64 +234,67 @@ else
                             <MudSelectItem T="string" Value="@("Chuyển khoản")">Chuyển khoản</MudSelectItem>
                         </MudSelect>
                     </MudItem>
-                    <MudItem xs="12" md="3">
+                    <MudItem xs="12" sm="6" md="3">
                         <MudTextField @bind-Value="_model.PaymentTime"
                                       Label="Thời gian thanh toán"
-                                      Variant="Variant.Outlined"
-                                      Disabled="@IsDriverEditableContentLocked" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="_model.Note"
-                                      Label="Ghi chú"
-                                      Lines="3"
                                       Variant="Variant.Outlined"
                                       Disabled="@IsDriverEditableContentLocked" />
                     </MudItem>
                 </MudGrid>
             </MudPaper>
 
-            <MudPaper Class="pa-4" Elevation="0" Style="border:1px solid var(--mud-palette-lines-default);">
+            <MudPaper Class="pa-4 driver-contract-section" Elevation="0" Outlined="true">
                 <MudStack Row="true" AlignItems="AlignItems.Center">
-                    <MudText Typo="Typo.h6">5. Danh sách hành khách</MudText>
-                    <MudNumericField T="int"
-                                     Value="@PassengerCount"
-                                     Label="Số lượng khách"
-                                     HelperText="Tự tính theo danh sách bên dưới"
-                                     Variant="Variant.Outlined"
-                                     Disabled="true"
-                                     Style="max-width:220px;" />
+                    <div>
+                        <MudText Typo="Typo.h6">4. Danh sách hành khách</MudText>
+                        <MudText Typo="Typo.caption">@PassengerCount hành khách</MudText>
+                    </div>
                     <MudSpacer />
                     @if (!IsDriverEditableContentLocked)
                     {
                         <MudButton StartIcon="@Icons.Material.Filled.Add"
                                    Variant="Variant.Outlined"
                                    OnClick="AddPassenger">
-                            Thêm hành khách
+                            Thêm người
                         </MudButton>
                     }
                 </MudStack>
 
-                <MudTable T="ContractPassengerDto" Items="_model.Passengers" Dense="true" Class="mt-3">
+                <MudTable T="ContractPassengerDto" Items="_model.Passengers" Dense="true" Class="mt-3 driver-passenger-table">
                     <HeaderContent>
                         <MudTh>STT</MudTh>
                         <MudTh>Họ tên</MudTh>
                         <MudTh>Năm sinh</MudTh>
-                        <MudTh>Ghi chú</MudTh>
                         <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="STT">@context.SortOrder</MudTd>
-                        <MudTd DataLabel="Họ tên"><MudTextField @bind-Value="context.FullName" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsDriverEditableContentLocked" /></MudTd>
-                        <MudTd DataLabel="Năm sinh"><MudNumericField T="int?" @bind-Value="context.BirthYear" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsDriverEditableContentLocked" /></MudTd>
-                        <MudTd DataLabel="Ghi chú"><MudTextField @bind-Value="context.Note" Variant="Variant.Outlined" Margin="Margin.Dense" Disabled="@IsDriverEditableContentLocked" /></MudTd>
+                        <MudTd DataLabel="Họ tên">
+                            <MudTextField @bind-Value="context.FullName"
+                                          Immediate="true"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Disabled="@IsDriverEditableContentLocked" />
+                        </MudTd>
+                        <MudTd DataLabel="Năm sinh">
+                            <MudNumericField T="int?"
+                                             @bind-Value="context.BirthYear"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             Disabled="@IsDriverEditableContentLocked" />
+                        </MudTd>
                         <MudTd>
                             @if (!IsDriverEditableContentLocked)
                             {
-                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(() => RemovePassenger(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemovePassenger(context))" />
                             }
                         </MudTd>
                     </RowTemplate>
-                    <NoRecordsContent><MudText Class="pa-3">Chưa có hành khách.</MudText></NoRecordsContent>
+                    <NoRecordsContent>
+                        <MudText Class="pa-3">Chưa có hành khách.</MudText>
+                    </NoRecordsContent>
                 </MudTable>
             </MudPaper>
 
@@ -439,7 +320,7 @@ else
                                StartIcon="@Icons.Material.Filled.Edit"
                                Disabled="@(_saving || _cancelling)"
                                OnClick="EnableEditing">
-                        Chỉnh sửa nội dung hợp đồng
+                        Chỉnh sửa
                     </MudButton>
                 }
 
@@ -449,7 +330,7 @@ else
                                Variant="Variant.Filled"
                                Disabled="@(_saving || _cancelling)"
                                OnClick="SaveAsync">
-                        @(Id.HasValue ? "Lưu nội dung hợp đồng" : "Tạo hợp đồng")
+                        @(Id.HasValue ? "Lưu hợp đồng" : "Tạo hợp đồng")
                     </MudButton>
                 }
             </MudStack>
@@ -458,71 +339,43 @@ else
 
     @if (Id.HasValue)
     {
-        <MudPaper Class="pa-4 mt-4" Elevation="1">
-            <MudText Typo="Typo.h6">Ký hợp đồng</MudText>
-            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
-                Chỉ tài khoản <b>Driver/Tài xế</b> được ghi nhận chữ ký của khách hàng trên hợp đồng này.
-                Khi tài xế bấm <b>Xác nhận chữ ký</b>, hệ thống tự lưu nội dung hợp đồng và danh sách hành khách trước,
-                sau đó lưu chữ ký khách hàng và chuyển hợp đồng sang <b>Hoàn tất</b>.
-            </MudAlert>
-            <MudGrid>
-                <MudItem xs="12" md="3">
-                    <MudText Typo="Typo.subtitle1">Văn phòng đại diện</MudText>
-                    <SignaturePad Disabled="true"
-                                  ExistingSignatureUrl="@FixedOfficeSignatureUrl"
-                                  SignerName="@OfficeSigner"
-                                  SignedAt="@FixedOfficeSignedAt" />
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudText Typo="Typo.subtitle1">Chủ sở hữu xe</MudText>
-                    <SignaturePad Disabled="true"
-                                  ExistingSignatureUrl="@FixedOwnerSignatureUrl"
-                                  SignerName="@OwnerSigner"
-                                  SignedAt="@FixedOwnerSignedAt" />
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudText Typo="Typo.subtitle1">Tài xế</MudText>
-                    <SignaturePad Disabled="true"
-                                  ExistingSignatureUrl="@FixedDriverSignatureUrl"
-                                  SignerName="@DriverSigner"
-                                  SignedAt="@FixedDriverSignedAt" />
-                </MudItem>
-                <MudItem xs="12" md="3">
-                    <MudText Typo="Typo.subtitle1">Khách hàng (Người thuê xe)</MudText>
-                    @if (HasCustomerSignature)
-                    {
-                        <SignaturePad Disabled="true"
-                                      ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
-                                      SignerName="@SignatureName(SignatureParty.Customer)"
-                                      SignedAt="@SignatureTime(SignatureParty.Customer)" />
-                    }
-                    else if (CanCustomerSign)
-                    {
-                        <SignaturePad Disabled="@(_saving || _savingSignature)"
-                                      ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
-                                      SignerName="@_model.CustomerName"
-                                      SignedAt="@SignatureTime(SignatureParty.Customer)"
-                                      OnSignatureSaved="SaveCustomerSignature" />
-                    }
-                    else
-                    {
-                        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
-                            Hợp đồng không còn ở trạng thái cho phép Driver ghi nhận chữ ký khách hàng.
-                        </MudAlert>
-                    }
-                </MudItem>
-            </MudGrid>
+        <MudPaper Class="pa-4 mt-4 driver-contract-section" Elevation="1">
+            <MudText Typo="Typo.h6" Class="mb-3">Khách hàng ký xác nhận</MudText>
+
+            @if (HasCustomerSignature)
+            {
+                <SignaturePad Disabled="true"
+                              ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
+                              SignerName="@SignatureName(SignatureParty.Customer)"
+                              SignedAt="@SignatureTime(SignatureParty.Customer)" />
+            }
+            else if (CanCustomerSign)
+            {
+                <SignaturePad Disabled="@(_saving || _savingSignature)"
+                              ExistingSignatureUrl="@SignatureUrl(SignatureParty.Customer)"
+                              SignerName="@_model.CustomerName"
+                              SignedAt="@SignatureTime(SignatureParty.Customer)"
+                              OnSignatureSaved="SaveCustomerSignature" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Dense="true">
+                    Trạng thái hiện tại không cho phép ghi nhận chữ ký khách hàng.
+                </MudAlert>
+            }
 
             <MudStack Row="true" Class="mt-4">
                 <MudButton Variant="Variant.Outlined" Href="/driver/contracts">Quay lại danh sách</MudButton>
                 <MudSpacer />
-                <MudButton Color="Color.Error"
-                           Variant="Variant.Filled"
-                           StartIcon="@Icons.Material.Filled.PictureAsPdf"
-                           Disabled="@(!CanGeneratePdf)"
-                           OnClick="GeneratePdfAsync">
-                    Tạo và mở PDF
-                </MudButton>
+                @if (CanGeneratePdf)
+                {
+                    <MudButton Color="Color.Error"
+                               Variant="Variant.Filled"
+                               StartIcon="@Icons.Material.Filled.PictureAsPdf"
+                               OnClick="GeneratePdfAsync">
+                        Mở PDF hợp đồng
+                    </MudButton>
+                }
             </MudStack>
         </MudPaper>
     }
@@ -804,6 +657,23 @@ else
     private Vehicle? SelectedVehicle => IsFinalLocked
         ? null
         : _vehicles.FirstOrDefault(x => x.Id == _model.VehicleId);
+    private string VehiclePlateDisplayText =>
+        SelectedVehicle?.PlateNumber
+        ?? _detail?.VehiclePlate
+        ?? "Chưa có biển số";
+    private string CustomerSummaryText
+    {
+        get
+        {
+            var name = string.IsNullOrWhiteSpace(_model.CustomerName)
+                ? "Chưa có khách hàng"
+                : _model.CustomerName.Trim();
+            var phone = string.IsNullOrWhiteSpace(_model.CustomerPhone)
+                ? string.Empty
+                : $" · {_model.CustomerPhone.Trim()}";
+            return $"{name}{phone}";
+        }
+    }
     private string CompanyDisplayText => IsFinalLocked && !string.IsNullOrWhiteSpace(_detail?.CompanyName)
         ? _detail.CompanyName
         : _driver?.CompanyProfile is null
